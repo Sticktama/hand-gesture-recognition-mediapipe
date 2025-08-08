@@ -14,6 +14,7 @@ import mediapipe as mp
 from utils import CvFpsCalc
 from model import KeyPointClassifier
 from model import PointHistoryClassifier
+from model import FSLClassifier
 
 
 def get_args():
@@ -61,7 +62,7 @@ def main():
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
         static_image_mode=use_static_image_mode,
-        max_num_hands=1,
+        max_num_hands=2,
         min_detection_confidence=min_detection_confidence,
         min_tracking_confidence=min_tracking_confidence,
     )
@@ -69,6 +70,8 @@ def main():
     keypoint_classifier = KeyPointClassifier()
 
     point_history_classifier = PointHistoryClassifier()
+
+    fsl_classifier = FSLClassifier()
 
     # Read labels ###########################################################
     with open('model/keypoint_classifier/keypoint_classifier_label.csv',
@@ -83,6 +86,12 @@ def main():
         point_history_classifier_labels = csv.reader(f)
         point_history_classifier_labels = [
             row[0] for row in point_history_classifier_labels
+        ]
+    with open('model/fsl_classifier/fsl_classifier_label.csv',
+              encoding='utf-8-sig') as f:
+        fsl_classifier_labels = csv.reader(f)
+        fsl_classifier_labels = [
+            row[0] for row in fsl_classifier_labels
         ]
 
     # FPS Measurement ########################################################
@@ -141,10 +150,10 @@ def main():
 
                 # Hand sign classification
                 hand_sign_id = keypoint_classifier(pre_processed_landmark_list)
-                if hand_sign_id == 2:  # Point gesture
-                    point_history.append(landmark_list[8])
-                else:
-                    point_history.append([0, 0])
+                #if hand_sign_id == 2:  # Point gesture
+                #    point_history.append(landmark_list[8])
+                #else:
+                #    point_history.append([0, 0])
 
                 # Finger gesture classification
                 finger_gesture_id = 0
@@ -152,6 +161,16 @@ def main():
                 if point_history_len == (history_length * 2):
                     finger_gesture_id = point_history_classifier(
                         pre_processed_point_history_list)
+                    
+                # Alphabet classification
+                alphabet_id   = fsl_classifier(pre_processed_landmark_list)
+                
+                alphabet_text = fsl_classifier_labels[alphabet_id]
+
+                if alphabet_id == 25: # Z gesture
+                    point_history.append(landmark_list[8])
+                else:
+                    point_history.append([0, 0])
 
                 # Calculates the gesture IDs in the latest detection
                 finger_gesture_history.append(finger_gesture_id)
@@ -167,6 +186,7 @@ def main():
                     handedness,
                     keypoint_classifier_labels[hand_sign_id],
                     point_history_classifier_labels[most_common_fg_id[0][0]],
+                    alphabet_text
                 )
         else:
             point_history.append([0, 0])
@@ -293,6 +313,27 @@ def logging_csv(number, mode, landmark_list, point_history_list):
             writer.writerow([number, *point_history_list])
     return
 
+# 0 -> WRIST
+# 1 -> THUMB_CMC
+# 2 -> THUMB_MCP
+# 3 -> THUMB_IP
+# 4 -> THUMB_TIP
+# 5 -> INDEX_FINGER_MCP
+# 6 -> INDEX_FINGER_PIP
+# 7 -> INDEX_FINGER_DIP
+# 8 -> INDEX_FINGER_TIP
+# 9 -> MIDDLE_FINGER_MCP
+# 10 -> MIDDLE_FINGER_PIP
+# 11 -> MIDDLE_FINGER_DIP
+# 12 -> MIDDLE_FINGER_TIP
+# 13 -> RING_FINGER_MCP
+# 14 -> RING_FINGER_PIP
+# 15 -> RING_FINGER_DIP
+# 16 -> RING_FINGER_TIP
+# 17 -> LITTLE_FINGER_MCP
+# 18 -> LITTLE_FINGER_PIP
+# 19 -> LITTLE_FINGER_DIP
+# 20 -> LITTLE_FINGER_TIP
 
 def draw_landmarks(image, landmark_point):
     if len(landmark_point) > 0:
@@ -492,13 +533,15 @@ def draw_bounding_rect(use_brect, image, brect):
 
 
 def draw_info_text(image, brect, handedness, hand_sign_text,
-                   finger_gesture_text):
+                   finger_gesture_text, alphabet_text):
     cv.rectangle(image, (brect[0], brect[1]), (brect[2], brect[1] - 22),
                  (0, 0, 0), -1)
 
     info_text = handedness.classification[0].label[0:]
     if hand_sign_text != "":
         info_text = info_text + ':' + hand_sign_text
+    if alphabet_text != "":
+        info_text = info_text + ' (' + alphabet_text + ')'
     cv.putText(image, info_text, (brect[0] + 5, brect[1] - 4),
                cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv.LINE_AA)
 
@@ -517,6 +560,15 @@ def draw_point_history(image, point_history):
         if point[0] != 0 and point[1] != 0:
             cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
                       (152, 251, 152), 2)
+            
+    pts = [tuple(p) for p in point_history if p[0] != 0 or p[1] != 0]
+    # Draw between consecutive points
+    for i in range(1, len(pts)):
+        pt1, pt2 = pts[i-1], pts[i]
+        # Black border
+        cv.line(image, pt1, pt2, (0, 0, 0), 4)
+        # Green core
+        cv.line(image, pt1, pt2, (152, 251, 152), 2)
 
     return image
 
