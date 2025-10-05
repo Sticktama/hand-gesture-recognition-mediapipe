@@ -1,3 +1,4 @@
 from model.keypoint_classifier.keypoint_classifier import KeyPointClassifier
 from model.point_history_classifier.point_history_classifier import PointHistoryClassifier
 from model.fsl_classifier.fsl_classifier import FSLClassifier
+from model.fsl_words_classifier.fsl_words_classifier import FSLWordsClassifier

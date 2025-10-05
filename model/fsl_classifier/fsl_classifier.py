@@ -6,7 +6,7 @@ import tensorflow as tf
 class FSLClassifier(object):
     def __init__(
         self,
-        model_path='model/fsl_classifier/fsl_classifier.tflite',
+        model_path='model/fsl_classifier/fsl_classifier-right.tflite',
         num_threads=1,
     ):
         # Load TFLite interpreter
